@@ -263,7 +263,7 @@ end
 | `kakao_sender_key` | `String` | 선택 | `nil` | 카카오 발신프로필 키 |
 | `sms_sender_key` | `String` | 선택 | `nil` | SMS 발신자 키 |
 | `api_version` | `String` | 선택 | `'v1'` | API 버전 (`v1` \| `v2`) |
-| `base_url` | `String` | 선택 | `'https://api.sendgo.io'` | API 기본 URL |
+| `base_url` | `String` | 선택 | `'https://sendgo.io'` | API 기본 URL |
 
 ---
 

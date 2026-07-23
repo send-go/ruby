@@ -12,12 +12,12 @@ module Sendgo
     end
 
     def post(path, body)
-      do_post(path, body, retry: false)
+      do_post(path, body, is_retry: false)
     end
 
     private
 
-    def do_post(path, body, retry: false)
+    def do_post(path, body, is_retry: false)
       token  = @token_manager.get_token
       url    = "#{@base_url}/api/#{@api_version}/#{path}"
       uri    = URI(url)
@@ -36,9 +36,9 @@ module Sendgo
       unless resp.is_a?(Net::HTTPSuccess)
         error_code = resp_body["code"]
         endpoint   = path.split("/").last
-        if !retry && @token_manager.should_refresh?(resp.code.to_i, error_code)
+        if !is_retry && @token_manager.should_refresh?(resp.code.to_i, error_code)
           @token_manager.invalidate
-          return do_post(path, body, retry: true)
+          return do_post(path, body, is_retry: true)
         end
         raise SendgoError.from_response(resp.code.to_i, resp_body, endpoint, @api_version)
       end

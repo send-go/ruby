@@ -13,7 +13,7 @@ module Sendgo
     attr_reader :alimtalk, :friendtalk, :sms
 
     def initialize(access_key:, secret_key:, kakao_sender_key: nil, sms_sender_key: nil,
-                   api_version: "v1", base_url: "https://api.sendgo.io")
+                   api_version: "v1", base_url: "https://sendgo.io")
       raise ArgumentError, "access_key와 secret_key는 필수입니다" if access_key.nil? || secret_key.nil?
 
       token_manager = TokenManager.new(base_url: base_url, access_key: access_key,
