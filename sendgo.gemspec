@@ -1,6 +1,8 @@
+require_relative "lib/sendgo/version"
+
 Gem::Specification.new do |spec|
   spec.name          = "sendgo"
-  spec.version       = "1.0.0"
+  spec.version       = Sendgo::VERSION
   spec.authors       = ["Sendgo"]
   spec.email         = ["dev@sendgo.io"]
   spec.summary       = "Sendgo Ruby SDK — 카카오 알림톡/친구톡, SMS/LMS/MMS"
