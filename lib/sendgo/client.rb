@@ -10,7 +10,8 @@ module Sendgo
   #     api_version: "v2"
   #   )
   class Client
-    attr_reader :alimtalk, :friendtalk, :sms
+    # brand_message: 카카오 브랜드메시지 — 친구톡의 후속 채널. v2 전용.
+    attr_reader :alimtalk, :friendtalk, :brand_message, :short_url, :sms
 
     def initialize(access_key:, secret_key:, kakao_sender_key: nil, sms_sender_key: nil,
                    api_version: "v1", base_url: "https://sendgo.io")
@@ -22,6 +23,9 @@ module Sendgo
 
       @alimtalk   = AlimtalkService.new(http: http, kakao_sender_key: kakao_sender_key, sms_sender_key: sms_sender_key)
       @friendtalk = FriendtalkService.new(http: http, kakao_sender_key: kakao_sender_key, sms_sender_key: sms_sender_key)
+      @brand_message = BrandMessageService.new(http: http, kakao_sender_key: kakao_sender_key, sms_sender_key: sms_sender_key)
+      # 짧은 URL — 링크 단축과 클릭 반응 분석. v2 전용.
+      @short_url  = ShortUrlService.new(http: http)
       @sms        = SmsService.new(http: http, sms_sender_key: sms_sender_key)
     end
   end

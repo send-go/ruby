@@ -12,21 +12,46 @@ module Sendgo
     end
 
     def post(path, body)
-      do_post(path, body, is_retry: false)
+      request(:post, path, body: body, is_retry: false)
+    end
+
+    # GET 요청. 캠페인 조회 엔드포인트에서 사용한다.
+    # params 의 nil 값은 제외되어 서버 기본값이 적용된다.
+    def get(path, params = {})
+      request(:get, path, params: params, is_retry: false)
+    end
+
+    # DELETE 요청. 짧은 URL 리다이렉트 중지에서 사용한다.
+    def delete(path)
+      request(:delete, path, is_retry: false)
     end
 
     private
 
-    def do_post(path, body, is_retry: false)
-      token  = @token_manager.get_token
-      url    = "#{@base_url}/api/#{@api_version}/#{path}"
-      uri    = URI(url)
-      payload = body.to_json
+    def request(method, path, body: nil, params: nil, is_retry: false)
+      token = @token_manager.get_token
+      url   = "#{@base_url}/api/#{@api_version}/#{path}"
+      uri   = URI(url)
 
-      req = Net::HTTP::Post.new(uri)
-      req["Content-Type"]  = "application/json"
+      if params && !params.empty?
+        query = params.reject { |_, v| v.nil? }
+        uri.query = URI.encode_www_form(query) unless query.empty?
+      end
+
+      req =
+        case method
+        when :get
+          Net::HTTP::Get.new(uri)
+        when :delete
+          # 바디 없는 DELETE. Post 분기로 흘러가면 조용히 POST 로 나간다.
+          Net::HTTP::Delete.new(uri)
+        else
+          Net::HTTP::Post.new(uri).tap do |r|
+            r["Content-Type"] = "application/json"
+            r.body = body.to_json
+          end
+        end
       req["Authorization"] = bearer_auth(token)
-      req.body = payload
 
       resp = Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == "https",
                              read_timeout: 15, open_timeout: 10) { |h| h.request(req) }
@@ -38,7 +63,7 @@ module Sendgo
         endpoint   = path.split("/").last
         if !is_retry && @token_manager.should_refresh?(resp.code.to_i, error_code)
           @token_manager.invalidate
-          return do_post(path, body, is_retry: true)
+          return request(method, path, body: body, params: params, is_retry: true)
         end
         raise SendgoError.from_response(resp.code.to_i, resp_body, endpoint, @api_version)
       end

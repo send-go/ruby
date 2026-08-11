@@ -4,6 +4,8 @@ require_relative "sendgo/token_manager"
 require_relative "sendgo/http_client"
 require_relative "sendgo/alimtalk"
 require_relative "sendgo/friendtalk"
+require_relative "sendgo/brand_message"
+require_relative "sendgo/short_url"
 require_relative "sendgo/sms"
 require_relative "sendgo/client"
 
