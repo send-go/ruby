@@ -315,6 +315,46 @@ end
 
 ---
 
+## 짧은 URL
+
+짧은 URL 은 메시지 본문의 링크를 줄이고, 그 링크가 실제로 눌렸는지 집계합니다.
+문자는 바이트 수가 요금과 직결되므로 링크를 줄이면 그만큼 본문을 더 쓸 수 있습니다.
+
+같은 원본 URL 을 다시 줄이면 **기존 링크가 그대로 반환**됩니다. 캠페인별로 반응을
+따로 집계하려면 `forceNew` 로 새 코드를 만드세요.
+
+`deactivate` 는 링크를 삭제하지 않고 리다이렉트만 중지합니다. 이미 발송한 메시지의
+링크를 무효화할 때 쓰며, 누적 통계는 남고 이후 접속은 `410 Gone` 이 됩니다.
+
+```ruby
+# 짧은 URL 생성 (v2 전용)
+created = sendgo.short_url.create(
+  target_url: "https://example.com/promotions/summer-sale",
+  title: "여름 세일 랜딩"
+)
+
+code = created.dig("data", "code")
+link = created.dig("data", "shortUrl")
+
+# 반응 통계 — 일별 추이 + 디바이스/유입경로/국가별 분해
+stats = sendgo.short_url.stats(code, from: "2026-08-01")
+
+sendgo.short_url.list(count: 10)
+sendgo.short_url.show(code)
+sendgo.short_url.deactivate(code)   # 리다이렉트만 중지, 통계는 남는다
+```
+
+`stats` 는 일별 추이(`daily`)와 디바이스(`byDevice`)·유입경로(`byReferer`)·국가(`byCountry`)별
+분해를 반환합니다. 일별 추이는 사전 집계 표에서 읽으므로 클릭이 많아도 응답 시간이 일정합니다.
+
+## 변경 사항
+
+### 1.1.0 (2026-08-11)
+
+- 짧은 URL 추가 — `client.short_url`
+- `HttpClient#delete` 추가
+- **버그 수정** — `request()` 가 Get/Post 만 만들어 `:delete` 가 조용히 POST 로 나가고 있었다. `Net::HTTP::Delete` 분기 추가.
+
 ## 라이선스
 
 MIT License © 2026 [Sendgo](https://sendgo.io)
