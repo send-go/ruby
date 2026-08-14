@@ -11,6 +11,7 @@ module Sendgo
   #   )
   class Client
     # brand_message: 카카오 브랜드메시지 — 친구톡의 후속 채널. v2 전용.
+    # friendtalk: @deprecated 2025-12-31 종료. brand_message 를 사용하세요.
     attr_reader :alimtalk, :friendtalk, :brand_message, :short_url, :sms
 
     def initialize(access_key:, secret_key:, kakao_sender_key: nil, sms_sender_key: nil,
