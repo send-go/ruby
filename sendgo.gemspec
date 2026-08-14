@@ -5,7 +5,7 @@ Gem::Specification.new do |spec|
   spec.version       = Sendgo::VERSION
   spec.authors       = ["Sendgo"]
   spec.email         = ["dev@sendgo.io"]
-  spec.summary       = "Sendgo Ruby SDK — 카카오 알림톡/친구톡, SMS/LMS/MMS"
+  spec.summary       = "Sendgo Ruby SDK — 카카오 알림톡/브랜드메시지, SMS/LMS/MMS"
   spec.description   = "Sendgo API를 Ruby에서 간편하게 사용하기 위한 공식 SDK"
   spec.homepage      = "https://sendgo.io"
   spec.license       = "MIT"
