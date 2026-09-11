@@ -7,6 +7,7 @@ require_relative "sendgo/friendtalk"
 require_relative "sendgo/brand_message"
 require_relative "sendgo/short_url"
 require_relative "sendgo/sms"
+require_relative "sendgo/management"
 require_relative "sendgo/client"
 
 # Sendgo Ruby SDK — 카카오 알림톡/친구톡, SMS/LMS/MMS

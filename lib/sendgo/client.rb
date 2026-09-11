@@ -14,6 +14,14 @@ module Sendgo
     # friendtalk: @deprecated 2025-12-31 종료. brand_message 를 사용하세요.
     attr_reader :alimtalk, :friendtalk, :brand_message, :short_url, :sms
 
+    # 관리 API (v2 전용) — 콘솔에서만 되던 등록·심사.
+    # 발송과 달리 대부분 즉시 완료되지 않는다 — 등록 성공은 "접수됨"이지
+    # "사용 가능"이 아니다. 카카오 채널 등록의 인증번호와 휴대폰 발신번호의
+    # 본인인증은 사람이 개입해야 하므로 API 로 대체되지 않는다.
+    attr_reader :kakao_senders, :notice_templates, :brand_templates,
+                :sender_registration, :message_templates,
+                :kakao_images, :rejected_numbers, :webhook
+
     def initialize(access_key:, secret_key:, kakao_sender_key: nil, sms_sender_key: nil,
                    api_version: "v1", base_url: "https://sendgo.io")
       raise ArgumentError, "access_key와 secret_key는 필수입니다" if access_key.nil? || secret_key.nil?
@@ -28,6 +36,15 @@ module Sendgo
       # 짧은 URL — 링크 단축과 클릭 반응 분석. v2 전용.
       @short_url  = ShortUrlService.new(http: http)
       @sms        = SmsService.new(http: http, sms_sender_key: sms_sender_key)
+
+      @kakao_senders       = KakaoSenderService.new(http: http)
+      @notice_templates    = NoticeTemplateService.new(http: http)
+      @brand_templates     = BrandTemplateService.new(http: http)
+      @sender_registration = SenderRegistrationService.new(http: http)
+      @message_templates   = MessageTemplateService.new(http: http)
+      @kakao_images        = KakaoImageService.new(http: http)
+      @rejected_numbers    = RejectedNumberService.new(http: http)
+      @webhook             = WebhookService.new(http: http)
     end
   end
 end

@@ -360,7 +360,289 @@ sendgo.short_url.deactivate(code)   # 리다이렉트만 중지, 통계는 남�
 `stats` 는 일별 추이(`daily`)와 디바이스(`byDevice`)·유입경로(`byReferer`)·국가(`byCountry`)별
 분해를 반환합니다. 일별 추이는 사전 집계 표에서 읽으므로 클릭이 많아도 응답 시간이 일정합니다.
 
+## 관리 API — 채널·템플릿·발신번호 등록 (v2 전용)
+
+발송은 처음부터 API였지만 **등록과 심사는 콘솔에서만** 되던 것들이 있었습니다.
+1.3.0 부터 그 작업도 코드로 처리합니다.
+
+| 서비스 | 하는 일 | 계정 |
+| --- | --- | --- |
+| `client.kakao_senders` | 카카오 채널 인증·등록·동기화, 브랜드메시지 M/N 신청 | 기업 |
+| `client.notice_templates` | 알림톡 템플릿 CRUD, 검수 요청·취소, 승인 취소, 휴면 해제 | 기업 |
+| `client.brand_templates` | 브랜드메시지(구 친구톡) 템플릿 CRUD, 동기화, 가져오기 | 기업 |
+| `client.sender_registration` | 발신번호 등록 신청, 중복 확인, 유형 안내 | 개인·기업 |
+| `client.message_templates` | 문자 상용구 템플릿 CRUD | 개인·기업 |
+| `client.kakao_images` | 카카오 이미지 업로드 — 템플릿용 URL 발급 | 기업 |
+| `client.rejected_numbers` | 수신거부(080) 번호 조회 | 개인·기업 |
+| `client.webhook` | 이벤트 웹훅 구독 — 심사 결과 수신 | 개인·기업 |
+
+> **sendgo.io 콘솔에 들어올 일이 없습니다.** 고객의 채널·발신번호·템플릿을
+> 여러분 화면만으로 끝까지 처리할 수 있습니다. 휴대폰 발신번호는 콘솔의 PASS
+> 본인인증 대신 **신분증 사본(`identityDocument`)을 받아 sendgo 운영자가 대신
+> 심사**합니다.
+>
+> 사람이 개입하는 지점은 **카카오 채널 인증번호 하나**뿐이고, 그마저도
+> 여러분 화면에서 입력받으면 됩니다 — 카카오가 관리자 휴대폰으로 직접 보내는
+> 확인이라 없앨 수 없습니다.
+>
+> 심사가 붙는 것들은 **비동기**입니다. 등록 호출이 성공했다는 건 "접수됐다"는
+> 뜻이지 "쓸 수 있다"는 뜻이 아닙니다 — 웹훅을 구독해 결과를 받으세요.
+
+인자는 snake_case 로 씁니다 — SDK 가 camelCase 로 변환해 보냅니다.
+
+### 카카오 채널 등록
+
+```ruby
+# 1단계 — 카카오가 관리자 휴대폰으로 인증번호를 SMS 발송한다 (응답에 번호는 없다)
+client.kakao_senders.request_token("@my-channel", "01012345678")
+
+# 2단계 — 사람이 받은 인증번호로 발신프로필 생성
+created = client.kakao_senders.create(
+  token: "123456",
+  yellow_id: "@my-channel",
+  phone_number: "01012345678",
+  category_code: "001001"      # categories 로 조회
+)
+
+kakao_sender_key = created.dig("data", "sender", "kakaoSenderKey")
+
+client.kakao_senders.categories
+client.kakao_senders.list
+client.kakao_senders.sync                    # 전체 상태 동기화 (하루 한 번 권장)
+client.kakao_senders.sync(kakao_sender_key)  # 단건
+```
+
+채널이 카카오 쪽에서 차단되면 발송이 조용히 실패하기 시작합니다. `sync` 를
+주기적으로 돌리고 `block: true` 인 채널을 감시하세요.
+
+### 알림톡 템플릿 등록과 검수
+
+```ruby
+created = client.notice_templates.create(
+  kakao_sender_key: kakao_sender_key,
+  template_name: "주문 접수 안내",
+  template_content: "\#{name}님, 주문 \#{orderNo}이 접수되었습니다.",
+  template_message_type: "BA",       # BA 기본형 / EX 부가정보형 / AD 채널추가형 / MI 복합형
+  template_emphasize_type: "NONE",   # NONE / TEXT / ITEM_LIST / IMAGE
+  category_code: "001001",
+
+  # sendgo 자체 정책 게이트 — 카카오 심사와 별개다
+  message_purpose: "order_delivery",
+  legal_basis: "transaction",
+  benefit_origin: "none",
+  expiry_type: "none",
+
+  # 선택 필드는 그냥 이어서 쓰면 된다 (snake_case → camelCase 자동 변환)
+  buttons: [{ name: "주문 조회", linkType: "WL", linkMo: "https://example.com/orders" }]
+)
+
+template_code = created.dig("data", "template", "templateCode")
+
+# 검수 요청 — 증빙이 필요하면 파일도 붙인다 (첨부가 있으면 comment 필수)
+client.notice_templates.request_inspection(template_code)
+
+File.open("proof.png", "rb") do |f|
+  client.notice_templates.request_inspection(
+    template_code,
+    comment: "주문 확인 화면 첨부",
+    attachments: [["proof.png", f, "image/png"]]
+  )
+end
+
+# 결과는 비동기다. 웹훅이 없으므로 폴링한다
+synced = client.notice_templates.sync(template_code)
+synced.dig("data", "template", "inspectionStatus")   # REG → REQ → APR / REJ
+```
+
+`opt_in_review_confirmed` · `cta_clear_confirmed` · `policy_confirmed` 는 기본값이
+`true` 지만, **내용을 실제로 검토한 뒤에** 그대로 두어야 합니다 — 이 값은 법적
+확인의 기록입니다.
+
+정책 필드 조합이 본문과 어긋나면 저장 단계에서 `POLICY_VALIDATION_FAILED` 로
+막힙니다. 예외의 `errors["reasons"]` 에 사유가 한국어로 담기니 그대로 사용자에게
+보여 주면 됩니다. 여기서 걸리는 문안은 **카카오 심사에서도 거의 반려**되므로,
+며칠 기다렸다 반려당하는 것보다 즉시 아는 편이 낫습니다.
+
+```ruby
+client.notice_templates.list(kakao_sender_key: kakao_sender_key, inspection_status: "APR")
+client.notice_templates.show(template_code)
+client.notice_templates.update(template_code, template_content: "...")  # 본문이 바뀌면 재검수 필요
+client.notice_templates.cancel_inspection(template_code)
+client.notice_templates.cancel_approval(template_code)
+client.notice_templates.release(template_code)   # 휴면 해제
+client.notice_templates.delete(template_code)    # sendgo 목록에서만 삭제된다
+client.notice_templates.categories
+```
+
+이미지 템플릿은 `image:` 로 파일을 넘기면 multipart 로 나갑니다.
+
+```ruby
+File.open("banner.jpg", "rb") do |f|
+  client.notice_templates.create(
+    kakao_sender_key: kakao_sender_key,
+    template_name: "이벤트 안내",
+    template_emphasize_type: "IMAGE",
+    image: ["banner.jpg", f, "image/jpeg"],
+    # ... 나머지 필드 동일
+  )
+end
+```
+
+> **삭제 동작이 채널마다 다릅니다.** 알림톡 템플릿은 카카오에 삭제 API 가 없어
+> sendgo 목록에서만 빠지고 동기화하면 되살아납니다. 브랜드메시지 템플릿은
+> 카카오 쪽에서도 실제로 삭제됩니다.
+
+### 브랜드메시지 템플릿
+
+```ruby
+created = client.brand_templates.create(
+  kakao_sender_key: kakao_sender_key,
+  template_name: "여름 세일 안내",
+  template_type: "FI",              # FT/FI/FW/FL/FC/FM/FP/FA — 서버가 chatBubbleType 으로 변환
+  template_content: "여름 세일이 시작되었습니다.",
+  image_url: "https://mud-kage.kakao.com/....jpg"
+)
+
+# 동보 발송(targeting="F")에는 변수가 없는 템플릿만 쓸 수 있다
+created.dig("data", "template", "containsVariables")
+
+client.brand_templates.list(kakao_sender_key: kakao_sender_key)
+client.brand_templates.sync(template_code)
+client.brand_templates.import(kakao_sender_key)   # 카카오에 있는 템플릿 가져오기
+client.brand_templates.delete(template_code)      # 카카오에서도 삭제된다
+```
+
+### 발신번호 등록 신청
+
+```ruby
+# 계정 종류에 맞는 유형과 유형별 필수 서류
+client.sender_registration.number_types
+
+# 형식·중복 미리 확인
+check = client.sender_registration.validate("02-1234-5678", "team_main")
+
+File.open("csu.pdf", "rb") do |f|
+  created = client.sender_registration.create(
+    sender_alias: "고객센터 대표번호",
+    sender_number_type: "team_main",   # personal_other / team_main / team_other_company
+    phone_e164: "02-1234-5678",
+    files: { csuCertificate: ["csu.pdf", f, "application/pdf"] }
+    # check.dig("data", "duplicationReasonRequired") 가 true 면 필수
+    # duplication_reason: "부서별 분리 운영"
+  )
+
+  created.dig("data", "sender", "status")   # PENDING — 운영자 승인 후 SUCCESS
+end
+
+client.sender_registration.list
+client.sender_registration.update(sender_key, sender_alias: "새 이름")
+client.sender_registration.delete(sender_key)
+```
+
+**휴대폰 유형도 API 로 접수할 수 있습니다.** 콘솔의 PASS 본인인증 대신
+신분증 사본(`identityDocument`)을 첨부하면 sendgo 운영자가 직접 확인합니다.
+이 경로로 접수된 건은 응답의 `identityVerificationMethod` 가 `document` 이고
+**자동 승인되지 않습니다** — 운영자 확인 전까지 `PENDING` 입니다.
+
+유형별 필수 서류는 `numberTypes()` 응답의 `requiredDocuments` 로 확인하세요.
+반려되면 `rejectionReason` 에 사유가 담깁니다.
+
+### 문자 템플릿
+
+```ruby
+client.message_templates.create(
+  message_tran_type: "LMS",
+  message_tran_subject: "주문 안내",   # LMS·MMS 는 필수
+  message_tran_msg: "주문이 접수되었습니다."
+)
+
+client.message_templates.list(message_type: "LMS")
+client.message_templates.update(template_key, message_tran_msg: "...")
+client.message_templates.delete(template_key)
+```
+
+### 이벤트 웹훅 — 심사 결과를 밀어 받기
+
+```ruby
+created = client.webhook.subscribe("https://reseller.example.com/hooks/sendgo")
+
+# 시크릿은 이 응답에서 한 번만 나온다. 즉시 저장한다.
+secret = created.dig("data", "secret")
+
+client.webhook.show          # 구독 설정 + 마지막 전송 결과
+client.webhook.test          # 배선 확인
+client.webhook.unsubscribe
+```
+
+받는 쪽에서는 **원본 바이트**로 서명을 검증합니다.
+
+```ruby
+# Rails 라면 request.raw_post 가 원본이다. params 를 다시 인코딩하면 안 된다.
+raw = request.raw_post
+
+unless Sendgo::WebhookService.verify_signature(raw, request.headers["X-Sendgo-Signature"], secret)
+  head :unauthorized and return
+end
+
+payload = JSON.parse(raw)
+# payload["event"] — sender.status_changed / notice_template.inspection_status_changed / ...
+```
+
+이벤트 목록은 `Sendgo::WebhookService::EVENTS` 로 확인할 수 있습니다.
+
+### 카카오 이미지 업로드
+
+브랜드메시지 템플릿의 `imageUrl` 은 **카카오가 호스팅하는 URL** 이어야 합니다.
+
+```ruby
+uploaded = File.open("banner.jpg", "rb") do |f|
+  client.kakao_images.upload("default", ["banner.jpg", f, "image/jpeg"])
+end
+
+client.brand_templates.create(
+  kakao_sender_key: kakao_sender_key,
+  template_name: "여름 세일 안내",
+  template_type: "FI",
+  image_url: uploaded.dig("data", "imageUrl")
+)
+
+client.kakao_images.upload_many("carousel_feed", slides)
+client.kakao_images.types   # 유형별 필드·최대 개수
+```
+
+### 수신거부(080) 동기화
+
+```ruby
+# 증분만 가져간다. 하루 한 번이면 충분하다.
+client.rejected_numbers.list(since: "2026-09-01", count: 500)
+```
+
+---
+
 ## 변경 사항
+
+### 1.3.0 (2026-09-11)
+
+- **관리 API 추가** — 콘솔에서만 되던 등록·심사를 코드로 처리합니다.
+  `client.kakao_senders`(채널 인증·등록·동기화, 브랜드메시지 M/N 신청),
+  `client.notice_templates`(알림톡 템플릿 CRUD·검수 요청·승인 취소·휴면 해제),
+  `client.brand_templates`(브랜드메시지 템플릿 CRUD·동기화·가져오기),
+  `client.sender_registration`(발신번호 등록 신청·중복 확인·유형 안내),
+  `client.message_templates`(문자 상용구 템플릿 CRUD).
+- `HttpClient` 에 `put`·`patch`·`post_multipart` 를 추가했습니다.
+  서류 첨부와 이미지 템플릿은 JSON 으로 보낼 수 없습니다.
+- **`request` 가 PUT/PATCH 를 POST 로 보내던 문제를 함께 고쳤습니다.**
+  `case method` 의 `else` 분기가 전부 `Net::HTTP::Post` 를 만들고 있어,
+  새 메서드를 그냥 얹었다면 405 만 받았을 자리입니다.
+- **휴대폰 발신번호도 API 로 접수됩니다.** 콘솔의 PASS 본인인증 대신
+  `identityDocument`(신분증 사본)를 첨부하면 sendgo 운영자가 확인합니다.
+  이 경로는 자동 승인되지 않고 항상 `PENDING` 으로 시작합니다.
+- **이벤트 웹훅** 추가 — 발신번호 승인, 알림톡 검수 결과, 채널 차단,
+  브랜드메시지 타겟팅 결과를 구독해 받습니다. 서명은 받은 원본 바이트로
+  검증합니다(SDK 에 검증 헬퍼 포함).
+- **카카오 이미지 업로드** 추가 — 브랜드메시지 템플릿의 `imageUrl` 은 카카오가
+  호스팅하는 URL 이어야 하는데, 그 URL 을 얻는 길이 콘솔에만 있었습니다.
+- **수신거부(080) 조회** 추가 — 자기 DB 의 수신 상태를 맞출 수 있습니다.
 
 ### 1.2.1 (2026-08-14)
 
