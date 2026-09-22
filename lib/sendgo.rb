@@ -27,3 +27,5 @@ require_relative "sendgo/client"
 #   )
 module Sendgo
 end
+
+require_relative "sendgo/account"
