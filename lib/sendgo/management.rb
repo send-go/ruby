@@ -119,9 +119,10 @@ module Sendgo
     end
 
     # 목록 조회.
-    def list(kakao_sender_key: nil, inspection_status: nil, search: nil, count: nil)
+    def list(kakao_sender_key: nil, inspection_status: nil, search: nil, count: nil, folder_uuid: nil)
       @http.get(RESOURCE, {
                   kakaoSenderKey: kakao_sender_key,
+                  folderUuid: folder_uuid,
                   inspectionStatus: inspection_status,
                   search: search,
                   count: count
@@ -250,8 +251,8 @@ module Sendgo
     end
 
     # 목록 조회.
-    def list(kakao_sender_key: nil, search: nil, count: nil)
-      @http.get(RESOURCE, { kakaoSenderKey: kakao_sender_key, search: search, count: count })
+    def list(kakao_sender_key: nil, search: nil, count: nil, folder_uuid: nil)
+      @http.get(RESOURCE, { folderUuid: folder_uuid, kakaoSenderKey: kakao_sender_key, search: search, count: count })
     end
 
     # 상세 조회. sendgo 코드(+KFT-...+)와 카카오 브랜드 템플릿 코드 둘 다 받는다.
@@ -591,6 +592,31 @@ module Sendgo
     # 무거워진다.
     def list(since: nil, search: nil, count: nil)
       @http.get(RESOURCE, { since: since, search: search, count: count })
+    end
+  end
+end
+
+module Sendgo
+  # 템플릿 공용 폴더. v2 전용, 기업 계정 전용.
+  class TemplateFolderService
+    def initialize(http:)
+      @http = http
+    end
+
+    def list(template_type: nil, kakao_sender_key: nil)
+      @http.get("template-folders", { templateType: template_type, kakaoSenderKey: kakao_sender_key })
+    end
+
+    def create(name:, parent_uuid: nil)
+      @http.post("template-folders", { name: name, parentUuid: parent_uuid })
+    end
+
+    # folder_uuid: nil이면 미분류로 이동합니다. 1~100개 코드가 필요합니다.
+    def assign(template_type:, kakao_sender_key:, template_codes:, folder_uuid:)
+      @http.patch("template-folders/templates", {
+        templateType: template_type, kakaoSenderKey: kakao_sender_key,
+        templateCodes: template_codes, folderUuid: folder_uuid
+      })
     end
   end
 end

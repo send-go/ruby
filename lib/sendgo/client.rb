@@ -22,7 +22,7 @@ module Sendgo
     # 화면에서 끝난다 — request_token 이 채널 관리자 휴대폰으로 SMS 를 보내고,
     # 사용자가 입력한 코드를 create 가 받는다. 휴대폰 발신번호는 PASS 대신
     # 신분증 사본을 첨부해 접수하면 sendgo 가 대신 심사한다.
-    attr_reader :kakao_senders, :notice_templates, :brand_templates,
+    attr_reader :template_folders, :kakao_senders, :notice_templates, :brand_templates,
                 :sender_registration, :message_templates,
                 :kakao_images, :rejected_numbers, :webhook
 
@@ -42,6 +42,7 @@ module Sendgo
       @sms        = SmsService.new(http: http, sms_sender_key: sms_sender_key)
 
       @kakao_senders       = KakaoSenderService.new(http: http)
+      @template_folders    = TemplateFolderService.new(http: http)
       @notice_templates    = NoticeTemplateService.new(http: http)
       @brand_templates     = BrandTemplateService.new(http: http)
       @sender_registration = SenderRegistrationService.new(http: http)
