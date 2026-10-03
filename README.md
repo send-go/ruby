@@ -153,7 +153,7 @@ client.friendtalk.send(
 > v2 전용입니다. 자유 본문 타입(`FT`/`FI`/`FW`)을 개별 수신자에게 보낼 때는 여전히 친구톡 API 를 쓰세요 — 이 엔드포인트는 그 조합에 `NOT_A_BRAND_MESSAGE` 를 반환합니다. 친구톡 요청은 카카오 측에서 브랜드메시지(자유형)로 대체 발송됩니다.
 
 ```ruby
-# 단건 발송 — 채널 친구 대상
+# 단건 발송 — 지정 수신자 대상
 client.brand_message.send(
   targeting: "M",
   message_type: "FL",
@@ -674,7 +674,7 @@ MIT License © 2026 [Sendgo](https://sendgo.io)
 
 *키워드: 카카오 알림톡 Ruby, 카카오 친구톡 Rails, SMS 발송 Ruby, 알림톡 Ruby gem, Ruby 카카오 API 연동, Sendgo Ruby SDK, Rails 알림 발송*
 
-## 계정·조직·API 키 관리 (1.5.0)
+## 계정·조직·API 키 관리 (1.6.0)
 
 발송용 `accessKey`/`secretKey`가 없는 단계에서 사용하는 **별도 계정 클라이언트**입니다.
 콘솔에서 발급받은 에이전트 토큰(`SENDGO_AGENT_TOKEN`)으로 `/api/v2/account`를 호출합니다.
@@ -699,7 +699,7 @@ issued = account.create_api_key({ name: '서버 연동' })
 
 키 생성 인자는 `name`, 선택적 `ipAddresses: [{ip, description}]`이며, 허용 IP 추가 인자는 `ip`, 선택적 `description`입니다. 키·IP 식별자는 응답의 `id`(UUID)를 사용합니다.
 
-## 템플릿 폴더 (1.5.0)
+## 템플릿 폴더 (1.6.0)
 
 기업 계정의 발송용 API 키와 `apiVersion=v2` 설정으로 사용하는 서버 전용 API입니다.
 폴더는 알림톡·브랜드메시지가 공유하며, 목록의 `templateType`은 `notice` 또는 `brand`입니다.
@@ -723,4 +723,39 @@ client.template_folders.assign(
 )
 client.notice_templates.list(folder_uuid: "none")
 # 템플릿 생성 시 folder_uuid: 폴더_UUID를 선택 인자로 전달합니다.
+```
+
+## 1.6 이메일 API와 브랜드 타기팅
+
+이메일은 서버 전용이며 클라이언트 설정에서 API 버전을 `v2`로 지정합니다.
+브랜드 타기팅은 `M`(친구+비친구), `N`(비친구), `I`(친구교집합),
+`O`(친구만), `F`(동보)를 지원합니다. `O`는 SDK에서 바꾸지 않고 서버로 전달합니다.
+
+이메일 발송·견적·조회·취소, 발신자·도메인 인증, 자격증명, 수신함·원본 EML,
+템플릿·주소록·연락처·발신자 프로필·캠페인 API를 지원합니다.
+일반 API는 기존 앱 Bearer 인증을 사용합니다. `EmailService`의
+`withCredentials` / `with_credentials` / `WithCredentials` / Go `NewEmailWithCredentials`는
+별도로 발급된 이메일 credential ID/password를 사용하며 `/api/v2/email-service`로 호출합니다.
+이 인증은 auth, 발송·견적·조회·취소와 도메인 API에만 사용할 수 있습니다.
+내부 email-gateway, 공개 서명 수신거부 URL은 SDK 관리 API가 아닙니다.
+
+단건 `to`는 이메일 주소 하나입니다. `send`에는 `idempotency_key`를 반드시 지정하고
+같은 발송의 재시도에는 같은 키를 재사용하세요. 캠페인 발송에는 견적 응답의
+`quote_hash`와 `idempotency_key`가 필요합니다. SDK가 키를 임의 생성하거나
+네트워크 오류·429·5xx를 자동 재시도하지 않습니다. Bearer 401만 최대 한 번
+갱신하며, 이메일 권한 거부 403 및 Basic 인증 실패는 그대로 반환합니다.
+마케팅 발송에는 `sender_name`, `sender_address`, `sender_contact`도 필요합니다.
+첨부는 `attachments: [{name, type, content}]`이며 content는 base64입니다.
+
+응답은 서버 JSON 객체 또는 배열을 그대로 반환하며 204는 null/nil/None입니다.
+원본 EML은 바이트(PHP/Ruby는 바이트 문자열)로 반환합니다. Java/Go/.NET/Dart는
+여러 응답 형태를 담는 Object/any/object/dynamic을 사용합니다(.NET JSON은 JsonElement).
+모든 관리 요청 본문은 서버 필드명(snake_case)을 그대로 사용합니다.
+
+아래 `client`는 기존 방식으로 구성한 v2 클라이언트입니다.
+
+```ruby
+client.email.send({from: 'sender@example.com', to: 'recipient@example.com',
+  subject: '접수 안내', purpose: 'transactional', text: '접수되었습니다.',
+  idempotency_key: 'order-123-email'})
 ```

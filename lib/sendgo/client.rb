@@ -12,6 +12,7 @@ module Sendgo
   class Client
     # brand_message: 카카오 브랜드메시지 — 친구톡의 후속 채널. v2 전용.
     # friendtalk: @deprecated 2025-12-31 종료. brand_message 를 사용하세요.
+    attr_reader :email
     attr_reader :alimtalk, :friendtalk, :brand_message, :short_url, :sms
 
     # 관리 API (v2 전용) — 콘솔에서만 되던 등록·심사.
@@ -34,6 +35,7 @@ module Sendgo
                                        secret_key: secret_key, api_version: api_version)
       http = HttpClient.new(token_manager: token_manager, base_url: base_url, api_version: api_version)
 
+      @email = EmailService.new(token_manager: token_manager, base_url: base_url, api_version: api_version)
       @alimtalk   = AlimtalkService.new(http: http, kakao_sender_key: kakao_sender_key, sms_sender_key: sms_sender_key)
       @friendtalk = FriendtalkService.new(http: http, kakao_sender_key: kakao_sender_key, sms_sender_key: sms_sender_key)
       @brand_message = BrandMessageService.new(http: http, kakao_sender_key: kakao_sender_key, sms_sender_key: sms_sender_key)

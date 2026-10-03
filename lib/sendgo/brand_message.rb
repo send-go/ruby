@@ -8,7 +8,7 @@ module Sendgo
   # 친구톡과 달리 채널 친구가 아닌 수신자에게도 보낼 수 있고(+targeting: "N"+),
   # 수신 동의한 전체 채널 친구에게 동보 발송할 수 있다(+targeting: "F"+).
   #
-  # @example 단건 발송 — 채널 친구 대상
+  # @example 단건 발송 — 지정 수신자 대상
   #   client.brand_message.send(
   #     targeting: "M",
   #     message_type: "FL",
@@ -30,7 +30,7 @@ module Sendgo
 
     # 브랜드메시지를 전송한다.
     #
-    # +targeting+ 이 "M"/"N"/"I" 이면 +contacts+ 가 필요하고 응답 data 에
+    # +targeting+ 이 "M"/"N"/"I"/"O" 이면 +contacts+ 가 필요하고 응답 data 에
     # 발송 건수(sentCount)가 담긴다. "F" 는 동보 발송이라 +contacts+ 없이
     # 접수 여부(accepted)만 반환되므로, 그 경우 #broadcast 가 더 명확하다.
     #
